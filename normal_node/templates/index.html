@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resilink Chat</title>
+    <script src="/static/socket.io.js"></script>
+    <script src="/static/jquery.min.js"></script>
+    <script src="/static/tailwind.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-6 text-center text-blue-600">Resilink Chat <span class="text-sm font-normal text-gray-500">(Node ID: <span id="node-id"></span>)</span></h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div id="chat" class="h-96 overflow-y-auto mb-4 p-4 bg-gray-50 rounded-md"></div>
+            <div class="flex flex-col sm:flex-row gap-2 mb-2">
+                <input type="text" id="destination" placeholder="Destination Node ID" class="flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <input type="text" id="message" placeholder="Type your message" class="flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button onclick="sendMessage()" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300">Send</button>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="latitude" placeholder="Latitude" class="flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <input type="text" id="longitude" placeholder="Longitude" class="flex-grow p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button onclick="insertGPS()" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300">Insert GPS</button>
+                <button onclick="getCurrentLocation()" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition duration-300">Get Current Location</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <button onclick="discoverNodes()" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300">Discover Nodes</button>
+            <button onclick="checkAcks()" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition duration-300">Check ACKs</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div id="discovered-nodes" class="bg-white rounded-lg shadow-md p-6"></div>
+            <div id="acks" class="bg-white rounded-lg shadow-md p-6"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const nodeId = "{{ node_id }}";
+        document.getElementById('node-id').textContent = nodeId;
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('new_message', (data) => {
+            let message = formatMessage(data);
+            $('#chat').append(`<p class="mb-2">${message}</p>`);
+            $('#chat').scrollTop($('#chat')[0].scrollHeight);
+        });
+
+        socket.on('discovered_nodes', (nodes) => {
+            $('#discovered-nodes').html('<h3 class="text-lg font-semibold mb-2">Discovered Nodes:</h3><ul class="list-disc pl-5">' + 
+                nodes.map(node => `<li>${node}</li>`).join('') + '</ul>');
+        });
+
+        function sendMessage() {
+            const destination = $('#destination').val();
+            const content = $('#message').val();
+            socket.emit('send_message', {destination: destination, content: content});
+            $('#message').val('');
+        }
+
+        function discoverNodes() {
+            socket.emit('discover');
+        }
+
+        function checkAcks() {
+            $.get('/acks', (data) => {
+                let ackHtml = '<h3 class="text-lg font-semibold mb-2">Acknowledgments:</h3><ul class="list-disc pl-5">';
+                for (let [uuid, status] of Object.entries(data)) {
+                    ackHtml += `<li>${uuid}: ${status}</li>`;
+                }
+                ackHtml += '</ul>';
+                $('#acks').html(ackHtml);
+            });
+        }
+
+        function formatMessage(data) {
+            let baseClass = "p-2 rounded-md mb-2 ";
+            let specificClass = "";
+            let content = "";
+
+            switch(data.type) {
+                case 'sent':
+                    specificClass = "bg-blue-100 text-blue-800";
+                    content = `Sent to ${data.destination} (Packet ID: [${data.packet_uuid}]): ${data.content}`;
+                    break;
+                case 'received':
+                    specificClass = "bg-green-100 text-green-800";
+                    content = `Received from ${data.from}: ${data.content}`;
+                    break;
+                case 'retransmitted':
+                    specificClass = "bg-yellow-100 text-yellow-800";
+                    content = `Retransmitted packet: ${data.packet_uuid}`;
+                    break;
+                case 'ack':
+                    specificClass = "bg-purple-100 text-purple-800";
+                    content = `Acknowledgment received for packet: ${data.packet_uuid}`;
+                    break;
+                case 'discover':
+                case 'discover_sent':
+                    specificClass = "bg-indigo-100 text-indigo-800";
+                    content = `Discover message ${data.type === 'discover' ? 'received' : 'sent'}: ${data.packet_uuid}`;
+                    break;
+                case 'announce':
+                case 'announce_sent':
+                    specificClass = "bg-pink-100 text-pink-800";
+                    content = `${data.type === 'announce' ? 'Node announced' : 'Announce message sent'}: ${data.node_id || data.packet_uuid}`;
+                    break;
+                case 'error':
+                    specificClass = "bg-red-100 text-red-800";
+                    content = `Error: ${data.message}`;
+                    break;
+                default:
+                    specificClass = "bg-gray-100 text-gray-800";
+                    content = `Unknown message type: ${JSON.stringify(data)}`;
+            }
+
+            return `<div class="${baseClass + specificClass}">${content}</div>`;
+        }
+
+        function insertGPS() {
+            const lat = $('#latitude').val();
+            const long = $('#longitude').val();
+            if (lat && long) {
+                const gpsString = `[GPS: ${lat}, ${long}]`;
+                $('#message').val($('#message').val() + ' ' + gpsString);
+            } else {
+                alert('Please enter both latitude and longitude.');
+            }
+        }
+
+        function getCurrentLocation() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude.toFixed(6);
+                    const long = position.coords.longitude.toFixed(6);
+                    $('#latitude').val(lat);
+                    $('#longitude').val(long);
+                    insertGPS();
+                }, function(error) {
+                    alert("Error getting location: " + error.message);
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Load existing messages
+        $.get('/messages', (data) => {
+            data.forEach((msg) => {
+                let message = formatMessage(msg);
+                $('#chat').append(message);
+            });
+            $('#chat').scrollTop($('#chat')[0].scrollHeight);
+        });
+    </script>
+</body>
+</html>
