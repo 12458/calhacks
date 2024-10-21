@@ -1,3 +1,13 @@
+## Calhacks 11.0
+
+This is our project for [Calhacks 11.0](https://hackberkeley.org/).
+
+[Devpost](https://devpost.com/software/resilink)
+
+We won:
+- 1st place for [Skylo: Seamlessly Switch from Cellular to Satellite](https://live.hackberkeley.org/prizes#:~:text=Skylo%3A%20Seamlessly%20Switch,our%20technical%20recruiter.)
+- [Cal Hacks: Hack for Impact](https://live.hackberkeley.org/prizes#:~:text=Skylo%3A%20Seamlessly%20Switch,our%20technical%20recruiter.)
+
 ### Overview
 
 Resililink is a node-based mesh network leveraging LoRa technology to facilitate communication in disaster-prone regions where traditional infrastructure, such as cell towers and internet services, is unavailable. The system is designed to operate in low-power environments and cover long distances, ensuring that essential communication can still occur when it is most needed. A key feature of this network is the integration of a "super" node equipped with satellite connectivity (via Skylo), which serves as the bridge between local nodes and a centralized server. The server processes the data and sends SMS notifications through Twilio to the intended recipients. Importantly, the system provides acknowledgment back to the originating node, confirming successful delivery of the message. This solution is aimed at enabling individuals to notify loved ones or emergency responders during critical times, such as natural disasters, when conventional communication channels are down.
